@@ -24,8 +24,12 @@
   }
 
   /* ---- 设置 ---- */
+  // 默认后端 = 已部署的 Cloudflare Worker（密钥在 CF，不在此）。任何设备打开即可真判题。
+  var DEFAULT_BACKEND = 'https://ai-kefu-proxy.thomaslei123.workers.dev';
   function getSettings() {
-    return read(K.settings, { grade: 'g7', backendUrl: '' });
+    var s = read(K.settings, { grade: 'g7', backendUrl: DEFAULT_BACKEND });
+    if (!s.backendUrl) s.backendUrl = DEFAULT_BACKEND;
+    return s;
   }
   function saveSettings(patch) {
     var s = getSettings();

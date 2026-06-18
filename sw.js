@@ -1,6 +1,6 @@
 /* Service Worker — 应用外壳缓存，首次联网打开后离线也能进。
    注意：AI 判题/对话是实时网络请求，不缓存（fetch 失败直接报错，不返回旧壳）。 */
-var CACHE = 'ai-kefu-v2';
+var CACHE = 'ai-kefu-v3';
 var ASSETS = [
   './',
   './index.html',
