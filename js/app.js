@@ -17,7 +17,8 @@
     analysis: null,      // 当前判题结果
     activeQ: 0,          // 作业帮式选中题号
     busy: false,
-    chat: []             // 追问对话
+    chat: [],            // 追问对话 [{role,content}]
+    chatBusy: false
   };
 
   var $app = function () { return document.getElementById('app'); };
@@ -81,10 +82,27 @@
     html += '</div>';
 
     // 判题结果（作业帮式）
-    if (state.analysis) html += renderResult(state.analysis);
+    if (state.analysis) {
+      html += renderResult(state.analysis);
+      html += renderChat();
+    }
 
     html += '</div>';
     return html;
+  }
+
+  function renderChat() {
+    var h = '<div class="card chat"><h3>💬 问 AI 老师<span class="sub">（针对这张卷子追问）</span></h3>';
+    h += '<div class="msgs">';
+    if (!state.chat.length) h += '<p class="hint">例如：第2题为什么错？这个知识点还能怎么考？</p>';
+    state.chat.forEach(function (m) {
+      h += '<div class="msg ' + m.role + '">' + esc(m.content).replace(/\n/g, '<br>') + '</div>';
+    });
+    if (state.chatBusy) h += '<div class="msg assistant typing">老师思考中…</div>';
+    h += '</div>';
+    h += '<div class="askbar"><textarea id="askText" rows="1" placeholder="输入问题…"></textarea><button class="btn primary sm" id="askBtn"' + (state.chatBusy ? ' disabled' : '') + '>问</button></div>';
+    h += '</div>';
+    return h;
   }
 
   function renderResult(a) {
@@ -141,6 +159,33 @@
     Array.prototype.forEach.call(document.querySelectorAll('[data-zoom]'), function (img) {
       img.onclick = function () { zoom(img.src); };
     });
+    var ask = document.getElementById('askText');
+    if (ask) {
+      autoGrow(ask);
+      var msgs = document.querySelector('.chat .msgs');
+      if (msgs) msgs.scrollTop = msgs.scrollHeight;
+      document.getElementById('askBtn').onclick = sendAsk;
+    }
+  }
+
+  function sendAsk() {
+    var ta = document.getElementById('askText');
+    var q = (ta.value || '').trim();
+    if (!q || state.chatBusy) return;
+    state.chat.push({ role: 'user', content: q });
+    state.chatBusy = true; render();
+    // 每条都附上卷图，让 GLM 始终能看着这张卷子答
+    var msgs = state.chat.map(function (m) { return { role: m.role, content: m.content }; });
+    var last = msgs[msgs.length - 1];
+    if (state.analysis && state.analysis.images && state.analysis.images.length) {
+      last.images = state.analysis.images.map(function (im) { return im.dataURL; });
+    }
+    Api.chat(msgs, state.grade, state.analysis ? state.analysis.subjectName : '').then(function (reply) {
+      state.chat.push({ role: 'assistant', content: reply });
+      state.chatBusy = false; render();
+    }).catch(function (e) {
+      state.chatBusy = false; render(); alert('答疑失败：' + e.message);
+    });
   }
 
   function readFiles(files) {
@@ -163,7 +208,7 @@
       question: (document.getElementById('qText') || {}).value || ''
     }).then(function (a) {
       Store.saveAnalysis(a);
-      state.analysis = a; state.activeQ = 0; state.busy = false; render();
+      state.analysis = a; state.activeQ = 0; state.busy = false; state.chat = []; render();
     }).catch(function (e) {
       state.busy = false; render(); alert('判题失败：' + e.message);
     });

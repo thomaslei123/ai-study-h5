@@ -33,7 +33,8 @@
         subjectName: Data.getSubject(payload.subjectId).name,
         textbook: Data.getSubject(payload.subjectId).textbook,
         images: payload.images || [],
-        question: payload.question || ''
+        question: payload.question || '',
+        knowledgePoints: (window.Knowledge ? Knowledge.pointsFor(payload.subjectId, payload.grade) : [])
       })
     }).then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -116,14 +117,15 @@
     };
   }
 
-  /* ---------- 对话答疑 ---------- */
-  function chat(messages, grade) {
+  /* ---------- 对话答疑 ----------
+   * messages: [{role,content,images?}]，最后一条 user 可带 images（dataURL 数组）→ 走 GLM 视觉。 */
+  function chat(messages, grade, subjectName) {
     if (mode() === 'http') {
       var base = Store.getSettings().backendUrl.replace(/\/$/, '');
       return fetch(base + '/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ grade: grade, messages: messages })
+        body: JSON.stringify({ grade: grade, subjectName: subjectName || '', messages: messages })
       }).then(function (r) {
         if (!r.ok) throw new Error('HTTP ' + r.status);
         return r.json();
@@ -131,7 +133,7 @@
     }
     return new Promise(function (resolve) {
       setTimeout(function () {
-        resolve('（示例回答）这是本地 mock。配置后端地址后接入真实 AI 老师答疑。');
+        resolve('（示例回答）这是本地 mock。在「我的 → AI 后端地址」填入代理地址后，即为真实 AI 老师答疑。');
       }, 500);
     });
   }
