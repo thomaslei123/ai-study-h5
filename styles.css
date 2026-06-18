@@ -1,0 +1,101 @@
+:root{
+  --blue:#2f6df6; --bg:#f4f6fb; --card:#fff; --line:#e6e9f0;
+  --txt:#1d2330; --mut:#7a8295; --good:#22a06b; --bad:#e5484d; --warn:#f0a020;
+  --tab-h:54px; --safe:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  font:14px/1.5 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  color:var(--txt);background:var(--bg);
+  padding-bottom:calc(var(--tab-h) + var(--safe));
+}
+#app{max-width:760px;margin:0 auto}
+
+/* 顶栏 */
+.hd{display:flex;align-items:center;gap:8px;padding:14px 14px 8px}
+.hd h1{font-size:18px;margin:0;flex:1}
+.grade-pill{background:#e8f0ff;color:var(--blue);border-radius:14px;padding:4px 12px;font-size:13px;font-weight:600}
+.page{padding:0 12px 24px}
+
+/* 通用卡片/按钮 */
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin:10px 0}
+.card h3{margin:0 0 8px;font-size:14px}
+.btn{border:none;border-radius:10px;padding:9px 14px;font-size:14px;font-weight:600;cursor:pointer;background:#eef1f6;color:var(--txt)}
+.btn.primary{background:var(--blue);color:#fff}
+.btn.ghost{background:#fff;border:1px solid var(--blue);color:var(--blue)}
+.btn.block{display:block;width:100%;margin-top:10px}
+.btn.sm{padding:6px 12px;font-size:13px;margin-top:8px}
+.btn:disabled{opacity:.55}
+.hint{color:var(--mut);font-size:12px;margin:8px 0 0}
+.inp{width:100%;border:1px solid var(--line);border-radius:9px;padding:9px;font-size:14px;margin-bottom:8px}
+
+/* 科目/年级 chips */
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.chip{border:1px solid var(--line);background:#fff;border-radius:18px;padding:6px 13px;font-size:13px;cursor:pointer}
+.chip.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+
+/* 上传区 */
+.thumbs{display:flex;flex-wrap:wrap;gap:8px}
+.thumb{position:relative;width:74px;height:74px;border-radius:9px;overflow:hidden}
+.thumb img{width:100%;height:100%;object-fit:cover}
+.thumb .del{position:absolute;top:0;right:0;background:rgba(0,0,0,.55);color:#fff;width:20px;height:20px;line-height:20px;text-align:center;border-bottom-left-radius:8px;font-size:14px;cursor:pointer}
+.addimg{width:74px;height:74px;border:1.5px dashed #c3ccdb;border-radius:9px;display:flex;align-items:center;justify-content:center;color:var(--mut);font-size:13px;cursor:pointer}
+.qtext{width:100%;border:1px solid var(--line);border-radius:9px;padding:9px;font-size:14px;margin-top:10px;resize:none;overflow:hidden}
+
+/* 判题结果·作业帮式 */
+.sumbar{font-size:13px;color:var(--txt);margin-bottom:8px}
+.sumbar .bad{color:var(--bad)} .sumbar .warn{color:var(--warn)}
+.suggest{background:#fff8e8;border-radius:9px;padding:8px 10px;font-size:13px;margin-bottom:10px}
+.qnums{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;overflow-x:auto}
+.qnum{border:1px solid var(--line);border-radius:8px;padding:5px 9px;font-size:13px;font-weight:600;cursor:pointer;background:#fff}
+.qnum.correct{color:var(--good)} .qnum.wrong{color:var(--bad)} .qnum.warning{color:var(--warn)}
+.qnum.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+.qdetail{display:flex;gap:12px}
+.qdetail .paper{width:38%;max-width:240px;border-radius:9px;object-fit:contain;align-self:flex-start;cursor:zoom-in;background:#f0f2f7}
+.qbody{flex:1;min-width:0}
+.qbody p{margin:6px 0;font-size:13px}
+.qbody .exp{color:#445;background:#f6f8fc;border-radius:8px;padding:8px}
+.qline{font-weight:600;margin-bottom:6px}
+.badge{display:inline-block;width:18px;height:18px;line-height:18px;text-align:center;border-radius:6px;color:#fff;font-size:12px}
+.badge.correct{background:var(--good)} .badge.wrong{background:var(--bad)} .badge.warning{background:var(--warn)}
+@media(max-width:520px){.qdetail{flex-direction:column}.qdetail .paper{width:100%;max-width:none}}
+
+/* 错题/复习 */
+.mk.done{opacity:.55}
+.mkhead{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;flex-wrap:wrap}
+.mkhead .spacer{flex:1}
+.tag{background:#e8f0ff;color:var(--blue);border-radius:6px;padding:2px 7px;font-size:12px}
+.lk{background:none;border:none;color:var(--blue);font-size:12px;cursor:pointer}
+.lk.del{color:var(--bad)}
+.mkimg{width:100%;max-height:200px;object-fit:contain;border-radius:8px;margin:8px 0;background:#f0f2f7}
+.card p{margin:6px 0;font-size:13px}.card .exp{color:#445;background:#f6f8fc;border-radius:8px;padding:8px}
+.flip .tap{color:var(--mut);font-size:12px;text-align:center;margin-top:8px}
+.hidden{display:none}
+
+/* 报告 */
+.stats{display:flex;gap:8px;margin:10px 0}
+.stat{flex:1;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;text-align:center}
+.stat b{display:block;font-size:22px;color:var(--blue)}
+.stat span{font-size:12px;color:var(--mut)}
+.bar{display:flex;align-items:center;gap:8px;margin:7px 0;font-size:12px}
+.bar .bl{width:42px} .bar .bn{width:24px;text-align:right;color:var(--mut)}
+.bar .bt{flex:1;background:#eef1f6;border-radius:6px;height:12px;overflow:hidden}
+.bar .bt i{display:block;height:100%;background:var(--blue)}
+
+.empty{text-align:center;color:var(--mut);padding:40px 20px;font-size:13px}
+.ver{text-align:center;color:var(--mut);font-size:12px;margin-top:18px}
+
+/* 底部 tab */
+#tabbar{position:fixed;left:0;right:0;bottom:0;height:calc(var(--tab-h) + var(--safe));
+  padding-bottom:var(--safe);background:#fff;border-top:1px solid var(--line);
+  display:flex;z-index:50}
+#tabbar .tab{flex:1;border:none;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--mut);cursor:pointer;font-size:11px}
+#tabbar .tab .ti{font-size:19px;line-height:1}
+#tabbar .tab.on{color:var(--blue)}
+
+/* 放大/toast */
+.zoom{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:100}
+.zoom img{max-width:96%;max-height:96%;object-fit:contain}
+.toast{position:fixed;left:50%;bottom:80px;transform:translate(-50%,8px);background:rgba(0,0,0,.8);color:#fff;padding:8px 16px;border-radius:18px;font-size:13px;opacity:0;transition:.25s;z-index:120}
+.toast.show{opacity:1;transform:translate(-50%,0)}

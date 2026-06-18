@@ -1,0 +1,305 @@
+/* 单页应用：底部 tab（问答/错题/复习/报告/我的）+ hash 路由。
+   纯前端 vanilla JS，无构建步骤；改文件刷新即生效。 */
+(function () {
+  var TABS = [
+    { id: 'home',    name: '问答', icon: '📷' },
+    { id: 'mistakes',name: '错题', icon: '📕' },
+    { id: 'review',  name: '复习', icon: '🔁' },
+    { id: 'report',  name: '报告', icon: '📊' },
+    { id: 'profile', name: '我的', icon: '👤' }
+  ];
+
+  var state = {
+    tab: 'home',
+    grade: 'g7',
+    subjectId: 'math',
+    images: [],          // {dataURL}
+    analysis: null,      // 当前判题结果
+    activeQ: 0,          // 作业帮式选中题号
+    busy: false,
+    chat: []             // 追问对话
+  };
+
+  var $app = function () { return document.getElementById('app'); };
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); }
+  function statusMark(s) { return s === 'correct' ? '✓' : s === 'wrong' ? '✗' : '?'; }
+
+  function start() {
+    state.grade = Store.getSettings().grade || 'g7';
+    renderTabbar();
+    go(location.hash.replace('#', '') || 'home');
+    window.addEventListener('hashchange', function () {
+      go(location.hash.replace('#', '') || 'home');
+    });
+  }
+
+  function go(tab) {
+    if (!TABS.some(function (t) { return t.id === tab; })) tab = 'home';
+    state.tab = tab;
+    if (location.hash !== '#' + tab) location.hash = tab;
+    render();
+    renderTabbar();
+    window.scrollTo(0, 0);
+  }
+
+  function renderTabbar() {
+    document.getElementById('tabbar').innerHTML = TABS.map(function (t) {
+      return '<button class="tab' + (state.tab === t.id ? ' on' : '') + '" data-tab="' + t.id + '">' +
+        '<span class="ti">' + t.icon + '</span><span class="tn">' + t.name + '</span></button>';
+    }).join('');
+    Array.prototype.forEach.call(document.querySelectorAll('#tabbar .tab'), function (b) {
+      b.onclick = function () { go(b.getAttribute('data-tab')); };
+    });
+  }
+
+  function render() {
+    var v = { home: viewHome, mistakes: viewMistakes, review: viewReview, report: viewReport, profile: viewProfile }[state.tab];
+    $app().innerHTML = v();
+    var bind = { home: bindHome, mistakes: bindMistakes, review: bindReview, report: bindReport, profile: bindProfile }[state.tab];
+    if (bind) bind();
+  }
+
+  /* ============ 问答（拍照判题 + 追问） ============ */
+  function viewHome() {
+    var subs = Data.subjectsForGrade(state.grade);
+    var html = '<header class="hd"><h1>📷 拍照判题</h1><span class="grade-pill" id="gradePill">' + Data.getGradeName(state.grade) + ' ▾</span></header>';
+    html += '<div class="page">';
+
+    // 科目选择
+    html += '<div class="chips">' + subs.map(function (s) {
+      return '<button class="chip' + (state.subjectId === s.id ? ' on' : '') + '" data-sub="' + s.id + '">' + s.icon + ' ' + s.name + '</button>';
+    }).join('') + '</div>';
+
+    // 上传区
+    html += '<div class="card upload">';
+    html += '<div class="thumbs">' + state.images.map(function (im, i) {
+      return '<div class="thumb"><img src="' + im.dataURL + '"/><span class="del" data-del="' + i + '">×</span></div>';
+    }).join('') + '<label class="addimg"><input type="file" accept="image/*" capture="environment" id="fileIn" multiple hidden/>＋拍/选</label></div>';
+    html += '<textarea id="qText" class="qtext" rows="1" placeholder="可补充：问哪道题、哪里不懂（选填）"></textarea>';
+    html += '<button class="btn primary block" id="analyzeBtn"' + (state.busy ? ' disabled' : '') + '>' + (state.busy ? '判题中…' : '开始判题') + '</button>';
+    if (Api.mode() === 'mock') html += '<p class="hint">当前为本地示例模式。接入 AI 后端后即真实判题（我的 → 后端地址）。</p>';
+    html += '</div>';
+
+    // 判题结果（作业帮式）
+    if (state.analysis) html += renderResult(state.analysis);
+
+    html += '</div>';
+    return html;
+  }
+
+  function renderResult(a) {
+    var s = a.summary;
+    var h = '<div class="card result">';
+    h += '<div class="sumbar"><b>' + esc(a.subjectName) + '</b> · 共' + s.total + '题 · <span class="bad">错' + s.wrong + '</span> · <span class="warn">存疑' + s.warning + '</span> · 得分率' + s.scoreRate + '%</div>';
+    if (s.suggestion) h += '<div class="suggest">💡 ' + esc(s.suggestion) + '</div>';
+    // 题号 tab
+    h += '<div class="qnums">' + a.questions.map(function (q, i) {
+      return '<button class="qnum ' + q.status + (i === state.activeQ ? ' on' : '') + '" data-q="' + i + '">' + (i + 1) + ' ' + statusMark(q.status) + '</button>';
+    }).join('') + '</div>';
+    var q = a.questions[state.activeQ] || a.questions[0];
+    if (q) {
+      h += '<div class="qdetail">';
+      if (a.images && a.images.length) h += '<img class="paper" src="' + a.images[0].dataURL + '" data-zoom/>';
+      h += '<div class="qbody">';
+      h += '<div class="qline"><span class="badge ' + q.status + '">' + statusMark(q.status) + '</span> ' + esc(q.number) + '　' + esc(q.title) + '</div>';
+      if (q.studentAnswer) h += '<p><b>作答：</b>' + esc(q.studentAnswer) + '</p>';
+      if (q.correctAnswer) h += '<p><b>答案：</b>' + esc(q.correctAnswer) + '</p>';
+      if (q.knowledgePoint) h += '<p><b>考点：</b>' + esc(q.knowledgePoint) + '</p>';
+      if (q.explanation) h += '<p class="exp">' + esc(q.explanation) + '</p>';
+      if (q.status !== 'correct') h += '<button class="btn ghost sm" data-addmk="' + state.activeQ + '">＋ 加入错题本</button>';
+      h += '</div></div>';
+    }
+    h += '</div>';
+    return h;
+  }
+
+  function bindHome() {
+    Array.prototype.forEach.call(document.querySelectorAll('.chip'), function (b) {
+      b.onclick = function () { state.subjectId = b.getAttribute('data-sub'); render(); };
+    });
+    document.getElementById('gradePill').onclick = function () {
+      state.grade = state.grade === 'g7' ? 'g8' : 'g7';
+      Store.saveSettings({ grade: state.grade });
+      // 切年级后科目可能不含物理
+      if (!Data.subjectsForGrade(state.grade).some(function (s) { return s.id === state.subjectId; })) state.subjectId = 'math';
+      render();
+    };
+    var fileIn = document.getElementById('fileIn');
+    if (fileIn) fileIn.onchange = function () { readFiles(fileIn.files); };
+    Array.prototype.forEach.call(document.querySelectorAll('[data-del]'), function (x) {
+      x.onclick = function () { state.images.splice(+x.getAttribute('data-del'), 1); render(); };
+    });
+    var ta = document.getElementById('qText');
+    if (ta) autoGrow(ta);
+    document.getElementById('analyzeBtn').onclick = doAnalyze;
+    Array.prototype.forEach.call(document.querySelectorAll('.qnum'), function (b) {
+      b.onclick = function () { state.activeQ = +b.getAttribute('data-q'); render(); };
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-addmk]'), function (b) {
+      b.onclick = function () { addToMistakes(+b.getAttribute('data-addmk')); };
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-zoom]'), function (img) {
+      img.onclick = function () { zoom(img.src); };
+    });
+  }
+
+  function readFiles(files) {
+    Array.prototype.forEach.call(files, function (f) {
+      var r = new FileReader();
+      r.onload = function () { state.images.push({ dataURL: r.result }); render(); };
+      r.readAsDataURL(f);
+    });
+  }
+
+  function doAnalyze() {
+    if (!state.images.length && !document.getElementById('qText').value.trim()) {
+      alert('先拍/选一张题目图片，或写下问题'); return;
+    }
+    state.busy = true; render();
+    Api.analyzeHomework({
+      grade: state.grade,
+      subjectId: state.subjectId,
+      images: state.images,
+      question: (document.getElementById('qText') || {}).value || ''
+    }).then(function (a) {
+      Store.saveAnalysis(a);
+      state.analysis = a; state.activeQ = 0; state.busy = false; render();
+    }).catch(function (e) {
+      state.busy = false; render(); alert('判题失败：' + e.message);
+    });
+  }
+
+  function addToMistakes(i) {
+    var a = state.analysis, q = a.questions[i];
+    Store.addMistake({
+      subjectId: a.subjectId, subjectName: a.subjectName, grade: a.grade,
+      number: q.number, title: q.title, correctAnswer: q.correctAnswer,
+      knowledgePoint: q.knowledgePoint, errorType: q.errorType, explanation: q.explanation,
+      image: (a.images[0] || {}).dataURL || ''
+    });
+    toast('已加入错题本');
+  }
+
+  /* ============ 错题本 ============ */
+  function viewMistakes() {
+    var list = Store.getMistakes();
+    var h = '<header class="hd"><h1>📕 错题本</h1></header><div class="page">';
+    if (!list.length) { h += empty('还没有错题。判完题点「加入错题本」就会出现在这里。'); return h + '</div>'; }
+    h += list.map(function (m) {
+      return '<div class="card mk' + (m.mastered ? ' done' : '') + '">' +
+        '<div class="mkhead"><span class="tag">' + esc(m.subjectName) + '</span> ' + esc(m.number || '') + ' ' + esc(m.title || '') +
+        '<span class="spacer"></span><button class="lk" data-master="' + m.id + '">' + (m.mastered ? '已掌握↺' : '掌握✓') + '</button>' +
+        '<button class="lk del" data-rm="' + m.id + '">删</button></div>' +
+        (m.image ? '<img class="mkimg" src="' + m.image + '" data-zoom/>' : '') +
+        (m.correctAnswer ? '<p><b>答案：</b>' + esc(m.correctAnswer) + '</p>' : '') +
+        (m.explanation ? '<p class="exp">' + esc(m.explanation) + '</p>' : '') +
+        '</div>';
+    }).join('');
+    return h + '</div>';
+  }
+  function bindMistakes() {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-master]'), function (b) {
+      b.onclick = function () { var id = b.getAttribute('data-master'); var m = Store.getMistakes().filter(function (x) { return x.id === id; })[0]; Store.updateMistake(id, { mastered: !m.mastered }); render(); };
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-rm]'), function (b) {
+      b.onclick = function () { if (confirm('删除这道错题？')) { Store.removeMistake(b.getAttribute('data-rm')); render(); } };
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-zoom]'), function (img) { img.onclick = function () { zoom(img.src); }; });
+  }
+
+  /* ============ 复习（翻卡） ============ */
+  function viewReview() {
+    var list = Store.getMistakes().filter(function (m) { return !m.mastered; });
+    var h = '<header class="hd"><h1>🔁 复习</h1></header><div class="page">';
+    if (!list.length) { h += empty('没有待复习的错题。把错题标「掌握」后会从这里移走。'); return h + '</div>'; }
+    h += '<p class="hint">共 ' + list.length + ' 道待复习。点卡片翻看答案。</p>';
+    h += list.map(function (m, i) {
+      return '<div class="card flip" data-flip="' + i + '">' +
+        '<div class="front"><span class="tag">' + esc(m.subjectName) + '</span> ' + esc(m.title || m.number || '题目') + (m.image ? '<img class="mkimg" src="' + m.image + '"/>' : '') + '<p class="tap">👆 点击看答案</p></div>' +
+        '<div class="back hidden">' + (m.correctAnswer ? '<p><b>答案：</b>' + esc(m.correctAnswer) + '</p>' : '') + (m.explanation ? '<p class="exp">' + esc(m.explanation) + '</p>' : '') + '<button class="btn ghost sm" data-master="' + m.id + '">我会了 ✓</button></div>' +
+        '</div>';
+    }).join('');
+    return h + '</div>';
+  }
+  function bindReview() {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-flip]'), function (c) {
+      c.onclick = function (e) {
+        if (e.target.getAttribute('data-master') != null) return;
+        c.querySelector('.front').classList.toggle('hidden');
+        c.querySelector('.back').classList.toggle('hidden');
+      };
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-master]'), function (b) {
+      b.onclick = function (e) { e.stopPropagation(); Store.updateMistake(b.getAttribute('data-master'), { mastered: true }); render(); };
+    });
+  }
+
+  /* ============ 报告 ============ */
+  function viewReport() {
+    var mk = Store.getMistakes(), an = Store.getAnalyses();
+    var bySub = {};
+    mk.forEach(function (m) { bySub[m.subjectName] = (bySub[m.subjectName] || 0) + 1; });
+    var h = '<header class="hd"><h1>📊 学习报告</h1></header><div class="page">';
+    h += '<div class="stats"><div class="stat"><b>' + an.length + '</b><span>判题次数</span></div>' +
+      '<div class="stat"><b>' + mk.length + '</b><span>错题总数</span></div>' +
+      '<div class="stat"><b>' + mk.filter(function (m) { return m.mastered; }).length + '</b><span>已掌握</span></div></div>';
+    if (Object.keys(bySub).length) {
+      h += '<div class="card"><h3>各科错题分布</h3>';
+      var max = Math.max.apply(null, Object.keys(bySub).map(function (k) { return bySub[k]; }));
+      Object.keys(bySub).forEach(function (k) {
+        h += '<div class="bar"><span class="bl">' + esc(k) + '</span><span class="bt"><i style="width:' + Math.round(bySub[k] / max * 100) + '%"></i></span><span class="bn">' + bySub[k] + '</span></div>';
+      });
+      h += '</div>';
+    } else { h += empty('还没有数据。多判几次题，这里会生成薄弱点分析。'); }
+    return h + '</div>';
+  }
+  function bindReport() {}
+
+  /* ============ 我的 ============ */
+  function viewProfile() {
+    var s = Store.getSettings();
+    var h = '<header class="hd"><h1>👤 我的</h1></header><div class="page">';
+    h += '<div class="card"><h3>年级</h3><div class="chips">' + Data.GRADES.map(function (g) {
+      return '<button class="chip' + (state.grade === g.id ? ' on' : '') + '" data-g="' + g.id + '">' + g.name + '</button>';
+    }).join('') + '</div></div>';
+    h += '<div class="card"><h3>AI 后端地址</h3><p class="hint">填入 AI 代理地址后即真实判题/答疑；留空则用本地示例。密钥在后端，不进网页。</p>' +
+      '<input id="backend" class="inp" placeholder="https://....workers.dev" value="' + esc(s.backendUrl || '') + '"/>' +
+      '<button class="btn primary sm" id="saveBackend">保存</button></div>';
+    h += '<div class="card"><h3>安装到主屏幕</h3><p class="hint">iPad/手机用 Safari 打开本网址 → 分享 → 「添加到主屏幕」，即可像 App 一样全屏打开。</p></div>';
+    h += '<div class="card"><h3>数据</h3><button class="btn ghost sm" id="clearData">清空本机数据</button></div>';
+    h += '<p class="ver">AI 课辅 · 初中　v0.1（骨架）</p>';
+    return h + '</div>';
+  }
+  function bindProfile() {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-g]'), function (b) {
+      b.onclick = function () { state.grade = b.getAttribute('data-g'); Store.saveSettings({ grade: state.grade }); render(); };
+    });
+    document.getElementById('saveBackend').onclick = function () {
+      Store.saveSettings({ backendUrl: document.getElementById('backend').value.trim() }); toast('已保存');
+    };
+    document.getElementById('clearData').onclick = function () {
+      if (confirm('清空本机所有判题/错题数据？不可恢复。')) { localStorage.clear(); state.analysis = null; toast('已清空'); render(); }
+    };
+  }
+
+  /* ============ 公用小组件 ============ */
+  function empty(msg) { return '<div class="empty">' + esc(msg) + '</div>'; }
+  function autoGrow(ta) {
+    var fit = function () { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; };
+    ta.addEventListener('input', fit); fit();
+  }
+  function zoom(src) {
+    var d = document.createElement('div');
+    d.className = 'zoom'; d.innerHTML = '<img src="' + src + '"/>';
+    d.onclick = function () { document.body.removeChild(d); };
+    document.body.appendChild(d);
+  }
+  function toast(msg) {
+    var t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(function () { t.classList.add('show'); }, 10);
+    setTimeout(function () { t.classList.remove('show'); setTimeout(function () { if (t.parentNode) document.body.removeChild(t); }, 300); }, 1400);
+  }
+
+  window.App = { start: start };
+})();

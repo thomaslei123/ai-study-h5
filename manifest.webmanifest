@@ -1,0 +1,19 @@
+{
+  "name": "AI 课辅 · 初中",
+  "short_name": "AI课辅",
+  "description": "拍照判题 · 错题本 · 复习报告 · 初中全科 AI 学习助手",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f4f6fb",
+  "theme_color": "#2f6df6",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
