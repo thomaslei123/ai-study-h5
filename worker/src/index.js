@@ -88,6 +88,12 @@ function reconcile(questions) {
     return m ? parseFloat(m[0]) : null;
   }
   questions.forEach(function (q) {
+    var sa = String(q.studentAnswer || '');
+    // 未作答 → 一律存疑(warning)，不当成错
+    if (/未作答|未答|空白|没有作答|留空/.test(sa) || !sa.trim()) {
+      q.status = 'warning';
+      return;
+    }
     if (q.status !== 'correct') return;
     var a = num(q.studentAnswer), b = num(q.correctAnswer);
     if (a !== null && b !== null && a !== b) {
@@ -103,15 +109,17 @@ function analyzeSystemPrompt(grade) {
     '请完成：',
     '0. 【自动识别科目】先判断这份作业属于哪一科，只能在以下取一：语文/数学/英语/物理/生物/地理/历史/道法。把结果填到 JSON 顶层 subject 字段（用上面这些中文名）。',
     '1. 识别图片中的【每一道】题目、学生作答与批改痕迹，从头到尾不要遗漏任何一题，也不要把多道题合并成一题。',
-    '2. 【独立判题·最重要】对每一道题，你必须先【自己】从头解一遍、算出真正的正确答案 correctAnswer，再拿它和学生作答 studentAnswer 比对：',
+    '2. 【认真辨认手写作答·重要】学生的作答常是手写的：圈选的字母、打勾、铅笔字、写在题号旁/横线上/答题区/页边的字或字母，都算"已作答"，要尽力辨认出来填进 studentAnswer。不要因为字迹潦草、颜色浅就当成没作答。只有该题确实完全空白时，studentAnswer 才填"未作答"。',
+    '3. 【选择题处理】若是选择题，title 里要带上完整题干和各选项（如"…… A.xx B.xx C.xx D.xx"）；studentAnswer 填学生选的字母（看圈选/打勾/写的字母，如"B"）；correctAnswer 填你判断的正确选项字母。',
+    '4. 【独立判题·最重要】对每一道题，你必须先【自己】从头解一遍、得出真正的正确答案 correctAnswer，再拿它和学生作答 studentAnswer 比对：',
     '   - 两者一致 → status=correct；不一致 → status=wrong（哪怕学生答案看起来合理也要判错）。',
-    '   - 【严禁】把题面/学生写出的得数默认当成正确答案。算式（如 12-7=4）一定要亲自计算验证：12-7=5≠4，应判 wrong，correctAnswer 填 5。',
-    '   - explanation 里给出你的计算/推理过程和错在哪。',
-    '3. 每道题的 knowledgePoint 填最贴近的该科知识点（如"有理数运算""文言文实词""一般现在时"）。',
-    '4. status 取值：correct(正确) / wrong(错误) / warning(疑似存疑或未作答)。',
-    '5. 【严禁臆造学生答案】studentAnswer 必须严格按图中学生真实笔迹识别：该题学生空着、没作答就写"未作答"并把 status 设为 warning，绝对不要替学生编造、猜测；字迹看不清就在 explanation 注明"字迹不清"。',
-    '6. 【输出前自检·必须执行】逐题检查：只要 correctAnswer 与 studentAnswer 不相等（数值或含义不同），该题 status 必须是 wrong；绝对不允许出现"correctAnswer 和 studentAnswer 不同却标成 correct"的矛盾。发现矛盾就改成 wrong 再输出。',
-    '7. 只输出一个 JSON 对象，不要任何额外文字或 Markdown 代码块。',
+    '   - 【严禁】把题面/学生写出的答案默认当成正确答案。算式（如 12-7=4）要亲自计算验证：12-7=5≠4，判 wrong，correctAnswer 填 5。',
+    '   - explanation 里给出你的推理/计算过程和错在哪。',
+    '5. 每道题的 knowledgePoint 填最贴近的该科知识点（如"有理数运算""古诗文默写""一般现在时"）。',
+    '6. status 取值：correct(正确) / wrong(错误) / warning(疑似存疑)。【特别规定】studentAnswer 为"未作答"的题，status 必须填 warning（不是 wrong），表示待确认是否真没做。',
+    '7. 【严禁臆造学生答案】不要替学生编造、猜测答案；字迹看不清就在 explanation 注明"字迹不清，请核对"，studentAnswer 填你能看清的部分或"字迹不清"。',
+    '8. 【输出前自检·必须执行】逐题检查：studentAnswer 已作答且与 correctAnswer 不相等 → status 必须是 wrong；studentAnswer="未作答" → status 必须是 warning；不允许"答案不同却标 correct"的矛盾。',
+    '9. 只输出一个 JSON 对象，不要任何额外文字或 Markdown 代码块。',
     'JSON 结构：',
     '{"subject":"语文","questions":[{"number":"第1题","status":"wrong","title":"题干","studentAnswer":"学生答案","correctAnswer":"参考答案","knowledgePoint":"知识点","errorType":"错因","explanation":"解析","similarQuestions":["同类题1","同类题2"]}],"summary":{"suggestion":"一句话总结建议","mainWeakPoints":["薄弱点1"],"actionItems":["行动1","行动2"]}}'
   ].join('\n');
