@@ -29,12 +29,8 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         grade: payload.grade,
-        subjectId: payload.subjectId,
-        subjectName: Data.getSubject(payload.subjectId).name,
-        textbook: Data.getSubject(payload.subjectId).textbook,
         images: payload.images || [],
-        question: payload.question || '',
-        knowledgePoints: (window.Knowledge ? Knowledge.pointsFor(payload.subjectId, payload.grade) : [])
+        question: payload.question || ''
       })
     }).then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -76,7 +72,9 @@
   }
 
   function normalizeAnalysis(raw, payload) {
-    var subject = Data.getSubject(payload.subjectId);
+    // 科目由 AI 自动识别（raw.subject 中文名）；识别不到回落 payload 或综合
+    var subjectId = raw.subject ? Data.subjectIdByName(raw.subject) : (payload.subjectId || 'other');
+    var subject = Data.getSubject(subjectId);
     var images = payload.images || [];
     var questions = (raw.questions || []).map(function (q, i) {
       return {
@@ -100,7 +98,7 @@
       id: Store.uid('analysis'),
       createdAt: Date.now(),
       grade: payload.grade,
-      subjectId: payload.subjectId,
+      subjectId: subjectId,
       subjectName: subject.name,
       textbook: subject.textbook,
       images: images,

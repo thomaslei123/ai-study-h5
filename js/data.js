@@ -25,7 +25,20 @@
   }
 
   function getSubject(id) {
-    return SUBJECTS.filter(function (s) { return s.id === id; })[0] || { id: id, name: id, textbook: '人教版' };
+    if (id === 'other') return { id: 'other', name: '综合', icon: '📝', textbook: '人教版' };
+    return SUBJECTS.filter(function (s) { return s.id === id; })[0] || { id: id, name: id || '综合', textbook: '人教版' };
+  }
+
+  // AI 返回的中文科目名 -> 内部 id（用于自动识别科目后的归类）
+  function subjectIdByName(name) {
+    if (!name) return 'other';
+    var n = String(name).replace(/学|课|科$/g, '');
+    var hit = SUBJECTS.filter(function (s) {
+      return name.indexOf(s.name) >= 0 || s.name.indexOf(n) >= 0 || name.indexOf(s.id) >= 0;
+    })[0];
+    if (hit) return hit.id;
+    if (/道德|法治|政治|道法/.test(name)) return 'morality';
+    return 'other';
   }
 
   function getGradeName(id) {
@@ -38,6 +51,7 @@
     SUBJECTS: SUBJECTS,
     subjectsForGrade: subjectsForGrade,
     getSubject: getSubject,
+    subjectIdByName: subjectIdByName,
     getGradeName: getGradeName
   };
 })();

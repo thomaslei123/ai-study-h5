@@ -59,13 +59,11 @@ async function analyze(request, env) {
   if (!c.glmKey) return json({ error: '后端未配置 GLM_API_KEY' }, 500);
   const body = await request.json();
   const grade = gradeName(body.grade);
-  const subjectName = body.subjectName || '';
-  const textbook = body.textbook || '人教版';
   const images = toBase64List(body.images);
   if (!images.length) return json({ error: '未收到图片' }, 400);
 
-  const sys = analyzeSystemPrompt(grade, subjectName, textbook);
-  const userText = analyzeUserText(body.knowledgePoints || [], body.question || '');
+  const sys = analyzeSystemPrompt(grade);
+  const userText = analyzeUserText(body.question || '');
   const content = [{ type: 'text', text: userText }];
   images.forEach(function (b64) { content.push({ type: 'image_url', image_url: { url: b64 } }); });
 
@@ -99,31 +97,29 @@ function reconcile(questions) {
   });
 }
 
-function analyzeSystemPrompt(grade, subjectName, textbook) {
+function analyzeSystemPrompt(grade) {
   return [
-    '你是初中' + textbook + subjectName + '作业批改助手，面向' + grade + '学生。',
+    '你是初中作业批改助手，面向广东中山一名' + grade + '学生（人教/统编版教材）。',
     '请完成：',
+    '0. 【自动识别科目】先判断这份作业属于哪一科，只能在以下取一：语文/数学/英语/物理/生物/地理/历史/道法。把结果填到 JSON 顶层 subject 字段（用上面这些中文名）。',
     '1. 识别图片中的【每一道】题目、学生作答与批改痕迹，从头到尾不要遗漏任何一题，也不要把多道题合并成一题。',
     '2. 【独立判题·最重要】对每一道题，你必须先【自己】从头解一遍、算出真正的正确答案 correctAnswer，再拿它和学生作答 studentAnswer 比对：',
     '   - 两者一致 → status=correct；不一致 → status=wrong（哪怕学生答案看起来合理也要判错）。',
     '   - 【严禁】把题面/学生写出的得数默认当成正确答案。算式（如 12-7=4）一定要亲自计算验证：12-7=5≠4，应判 wrong，correctAnswer 填 5。',
     '   - explanation 里给出你的计算/推理过程和错在哪。',
-    '3. 每道题的 knowledgePoint 选最贴近的学科知识点，不要自创无关知识点。',
+    '3. 每道题的 knowledgePoint 填最贴近的该科知识点（如"有理数运算""文言文实词""一般现在时"）。',
     '4. status 取值：correct(正确) / wrong(错误) / warning(疑似存疑或未作答)。',
     '5. 【严禁臆造学生答案】studentAnswer 必须严格按图中学生真实笔迹识别：该题学生空着、没作答就写"未作答"并把 status 设为 warning，绝对不要替学生编造、猜测；字迹看不清就在 explanation 注明"字迹不清"。',
     '6. 【输出前自检·必须执行】逐题检查：只要 correctAnswer 与 studentAnswer 不相等（数值或含义不同），该题 status 必须是 wrong；绝对不允许出现"correctAnswer 和 studentAnswer 不同却标成 correct"的矛盾。发现矛盾就改成 wrong 再输出。',
     '7. 只输出一个 JSON 对象，不要任何额外文字或 Markdown 代码块。',
     'JSON 结构：',
-    '{"questions":[{"number":"第1题","status":"wrong","title":"题干","studentAnswer":"学生答案","correctAnswer":"参考答案","knowledgePoint":"知识点","errorType":"错因","explanation":"解析","similarQuestions":["同类题1","同类题2"]}],"summary":{"suggestion":"一句话总结建议","mainWeakPoints":["薄弱点1"],"actionItems":["行动1","行动2"]}}'
+    '{"subject":"语文","questions":[{"number":"第1题","status":"wrong","title":"题干","studentAnswer":"学生答案","correctAnswer":"参考答案","knowledgePoint":"知识点","errorType":"错因","explanation":"解析","similarQuestions":["同类题1","同类题2"]}],"summary":{"suggestion":"一句话总结建议","mainWeakPoints":["薄弱点1"],"actionItems":["行动1","行动2"]}}'
   ].join('\n');
 }
 
-function analyzeUserText(knowledgePoints, question) {
-  const kp = knowledgePoints.length
-    ? knowledgePoints.map(function (p) { return typeof p === 'string' ? p : p.path; }).join('\n')
-    : '（未提供，请按学科常规知识点归类）';
+function analyzeUserText(question) {
   const q = question ? ('\n【学生补充说明】\n' + question + '\n') : '';
-  return ['【知识点清单（knowledgePoint 尽量从这里选）】', kp, q, '请批改图片中的作业，按系统要求输出 JSON。'].join('\n');
+  return ['请先识别科目，再批改图片中的作业，按系统要求输出 JSON。' + q].join('\n');
 }
 
 /* ---------- /chat 答疑 ---------- */

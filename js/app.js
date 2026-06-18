@@ -62,17 +62,12 @@
 
   /* ============ 问答（拍照判题 + 追问） ============ */
   function viewHome() {
-    var subs = Data.subjectsForGrade(state.grade);
     var html = '<header class="hd"><h1>📷 拍照判题</h1><span class="grade-pill" id="gradePill">' + Data.getGradeName(state.grade) + ' ▾</span></header>';
     html += '<div class="page">';
 
-    // 科目选择
-    html += '<div class="chips">' + subs.map(function (s) {
-      return '<button class="chip' + (state.subjectId === s.id ? ' on' : '') + '" data-sub="' + s.id + '">' + s.icon + ' ' + s.name + '</button>';
-    }).join('') + '</div>';
-
-    // 上传区
+    // 上传区（科目由 AI 自动识别，无需手选）
     html += '<div class="card upload">';
+    html += '<p class="hint" style="margin:0 0 8px">拍作业 → AI 自动识别科目并判题</p>';
     html += '<div class="thumbs">' + state.images.map(function (im, i) {
       return '<div class="thumb"><img src="' + im.dataURL + '"/><span class="del" data-del="' + i + '">×</span></div>';
     }).join('') + '<label class="addimg"><input type="file" accept="image/*" capture="environment" id="fileIn" multiple hidden/>＋拍/选</label></div>';
@@ -132,14 +127,9 @@
   }
 
   function bindHome() {
-    Array.prototype.forEach.call(document.querySelectorAll('.chip'), function (b) {
-      b.onclick = function () { state.subjectId = b.getAttribute('data-sub'); render(); };
-    });
     document.getElementById('gradePill').onclick = function () {
       state.grade = state.grade === 'g7' ? 'g8' : 'g7';
       Store.saveSettings({ grade: state.grade });
-      // 切年级后科目可能不含物理
-      if (!Data.subjectsForGrade(state.grade).some(function (s) { return s.id === state.subjectId; })) state.subjectId = 'math';
       render();
     };
     var fileIn = document.getElementById('fileIn');
@@ -197,13 +187,12 @@
   }
 
   function doAnalyze() {
-    if (!state.images.length && !document.getElementById('qText').value.trim()) {
-      alert('先拍/选一张题目图片，或写下问题'); return;
+    if (!state.images.length) {
+      alert('先拍一张作业照片'); return;
     }
     state.busy = true; render();
     Api.analyzeHomework({
       grade: state.grade,
-      subjectId: state.subjectId,
       images: state.images,
       question: (document.getElementById('qText') || {}).value || ''
     }).then(function (a) {
