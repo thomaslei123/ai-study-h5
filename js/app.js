@@ -3,6 +3,7 @@
 (function () {
   var TABS = [
     { id: 'home',    name: '问答', icon: '📷' },
+    { id: 'book',    name: '课本', icon: '📚' },
     { id: 'mistakes',name: '错题', icon: '📕' },
     { id: 'review',  name: '复习', icon: '🔁' },
     { id: 'report',  name: '报告', icon: '📊' },
@@ -18,7 +19,9 @@
     activeQ: 0,          // 作业帮式选中题号
     busy: false,
     chat: [],            // 追问对话 [{role,content}]
-    chatBusy: false
+    chatBusy: false,
+    bookSubject: null,   // 课本重点：当前科目
+    bookChap: -1         // 课本重点：展开的章节（-1=全收起）
   };
 
   var $app = function () { return document.getElementById('app'); };
@@ -54,10 +57,58 @@
   }
 
   function render() {
-    var v = { home: viewHome, mistakes: viewMistakes, review: viewReview, report: viewReport, profile: viewProfile }[state.tab];
+    var v = { home: viewHome, book: viewBook, mistakes: viewMistakes, review: viewReview, report: viewReport, profile: viewProfile }[state.tab];
     $app().innerHTML = v();
-    var bind = { home: bindHome, mistakes: bindMistakes, review: bindReview, report: bindReport, profile: bindProfile }[state.tab];
+    var bind = { home: bindHome, book: bindBook, mistakes: bindMistakes, review: bindReview, report: bindReport, profile: bindProfile }[state.tab];
     if (bind) bind();
+  }
+
+  /* ============ 课本重点速记 ============ */
+  function viewBook() {
+    var subjects = Data.subjectsForGrade(state.grade);
+    if (!state.bookSubject || !subjects.some(function (s) { return s.id === state.bookSubject; })) {
+      state.bookSubject = subjects[0] ? subjects[0].id : 'math';
+    }
+    var h = '<header class="hd"><h1>📚 课本重点</h1></header><div class="page">';
+    // 年级
+    h += '<div class="chips">' + Data.GRADES.map(function (g) {
+      return '<button class="chip' + (state.grade === g.id ? ' on' : '') + '" data-bg="' + g.id + '">' + g.name + '</button>';
+    }).join('') + '</div>';
+    // 科目
+    h += '<div class="chips">' + subjects.map(function (s) {
+      var has = Digest.get(s.id, state.grade).length;
+      return '<button class="chip' + (state.bookSubject === s.id ? ' on' : '') + '" data-bs="' + s.id + '">' + s.icon + ' ' + s.name + (has ? '' : '·待补') + '</button>';
+    }).join('') + '</div>';
+    // 内容
+    var list = Digest.get(state.bookSubject, state.grade);
+    if (!list.length) {
+      h += empty('「' + Data.getSubject(state.bookSubject).name + '·' + Data.getGradeName(state.grade) + '」的重点速记还在整理中，稍后补上。');
+      return h + '</div>';
+    }
+    var curVol = '';
+    list.forEach(function (c, i) {
+      if (c.volume && c.volume !== curVol) { curVol = c.volume; h += '<div class="vol">' + esc(curVol) + '</div>'; }
+      h += '<div class="card chap"><div class="chaphd" data-ch="' + i + '"><b>' + esc(c.chapter) + '</b><span class="arrow">' + (state.bookChap === i ? '▴' : '▾') + '</span></div>';
+      h += '<ul class="keys' + (state.bookChap === i ? '' : ' hidden') + '" data-keys="' + i + '">' +
+        c.keys.map(function (k) { return '<li>' + esc(k) + '</li>'; }).join('') + '</ul></div>';
+    });
+    return h + '</div>';
+  }
+
+  function bindBook() {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-bg]'), function (b) {
+      b.onclick = function () { state.grade = b.getAttribute('data-bg'); Store.saveSettings({ grade: state.grade }); state.bookSubject = null; state.bookChap = -1; render(); };
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-bs]'), function (b) {
+      b.onclick = function () { state.bookSubject = b.getAttribute('data-bs'); state.bookChap = -1; render(); };
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-ch]'), function (b) {
+      b.onclick = function () {
+        var i = +b.getAttribute('data-ch');
+        state.bookChap = (state.bookChap === i) ? -1 : i;
+        render();
+      };
+    });
   }
 
   /* ============ 问答（拍照判题 + 追问） ============ */
@@ -128,7 +179,7 @@
 
   function bindHome() {
     document.getElementById('gradePill').onclick = function () {
-      state.grade = state.grade === 'g7' ? 'g8' : 'g7';
+      state.grade = Data.nextGrade(state.grade);
       Store.saveSettings({ grade: state.grade });
       render();
     };

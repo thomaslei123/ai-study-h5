@@ -1,9 +1,9 @@
 /* Service Worker — 网络优先（在线永远拿最新代码，离线才用缓存）。
    开发期最重要：避免旧 JS 被缓存导致"改了不生效"。AI 判题/对话是 POST，不经此。 */
-var CACHE = 'ai-kefu-v4';
+var CACHE = 'ai-kefu-v5';
 var ASSETS = [
   './', './index.html', './styles.css', './manifest.webmanifest', './icon.svg',
-  './js/data.js', './js/knowledge.js', './js/storage.js', './js/api.js', './js/app.js'
+  './js/data.js', './js/knowledge.js', './js/digest.js', './js/storage.js', './js/api.js', './js/app.js'
 ];
 
 self.addEventListener('install', function (e) {
