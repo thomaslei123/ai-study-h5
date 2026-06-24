@@ -13,12 +13,8 @@
 
   /* ---------- 判题 ---------- */
   function analyzeHomework(payload) {
-    if (mode() === 'http') {
-      return analyzeViaHttp(payload).catch(function (err) {
-        console.error('[ai] 后端判题失败，回退示例：', err);
-        return analyzeViaMock(payload);
-      });
-    }
+    // 配了后端就走真实判题；失败不再静默回退假数据，而是把真实错误抛出来（界面会弹出原因）。
+    if (mode() === 'http') return analyzeViaHttp(payload);
     return analyzeViaMock(payload);
   }
 
@@ -34,8 +30,10 @@
         model: Store.getSettings().model || 'claude'
       })
     }).then(function (r) {
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.json();
+      return r.json().catch(function () { return {}; }).then(function (d) {
+        if (!r.ok) throw new Error((d && d.error) ? d.error : ('HTTP ' + r.status));
+        return d;
+      });
     }).then(function (raw) {
       return normalizeAnalysis(raw, payload);
     });
@@ -99,6 +97,7 @@
       id: Store.uid('analysis'),
       createdAt: Date.now(),
       grade: payload.grade,
+      question: payload.question || '',
       subjectId: subjectId,
       subjectName: subject.name,
       textbook: subject.textbook,

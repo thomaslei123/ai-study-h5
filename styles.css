@@ -40,6 +40,9 @@ body{
 .chips.sm .chip{padding:4px 10px;font-size:12px;border-radius:14px;display:inline-flex;align-items:baseline;gap:4px}
 .chips.sm .chip i{font-style:normal;font-size:10px;opacity:.6}
 .chips.sm .chip.on i{opacity:.85}
+.askrec{background:#eef3ff;border-left:3px solid var(--blue);border-radius:6px;padding:6px 10px;margin:8px 0;font-size:13px;color:#334}
+.papers{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+.papers .paper{flex:0 0 auto;max-height:240px;border-radius:6px}
 
 /* 上传区 */
 .thumbs{display:flex;flex-wrap:wrap;gap:8px}

@@ -167,6 +167,8 @@ function analyzeSystemPrompt(grade) {
     '6. status 取值：correct(正确) / wrong(错误) / warning(疑似存疑)。【特别规定】studentAnswer 为"未作答"的题，status 必须填 warning（不是 wrong），表示待确认是否真没做。',
     '7. 【严禁臆造学生答案】不要替学生编造、猜测答案；字迹看不清就在 explanation 注明"字迹不清，请核对"，studentAnswer 填你能看清的部分或"字迹不清"。',
     '8. 【输出前自检·必须执行】逐题检查：studentAnswer 已作答且与 correctAnswer 不相等 → status 必须是 wrong；studentAnswer="未作答" → status 必须是 warning；不允许"答案不同却标 correct"的矛盾。',
+    '8a.【多张图/多份试卷·重要】若上传的图片包含不同科目或不同试卷，只批改其中题目最多、作答最完整的【同一份】试卷，subject 填这一份的科目；绝不要把不同试卷的题目混在一起，更不要拿甲卷（如语文）的作答去套到乙卷（如英语）。判完在 summary.suggestion 里注明"检测到多份试卷，只批改了其中X科"。',
+    '8b.【整卷空白·重要】若某份试卷几乎没有任何作答痕迹（全空），它的每道题 studentAnswer 一律填"未作答"、status 一律 warning，summary 得分不要给高分；严禁因为题目本身有标准答案就标 correct 或臆造学生得分。',
     '9. 只输出一个 JSON 对象，不要任何额外文字或 Markdown 代码块。',
     'JSON 结构：',
     '{"subject":"语文","questions":[{"number":"第1题","status":"wrong","title":"题干","studentAnswer":"学生答案","correctAnswer":"参考答案","knowledgePoint":"知识点","errorType":"错因","explanation":"解析","similarQuestions":["同类题1","同类题2"]}],"summary":{"suggestion":"一句话总结建议","mainWeakPoints":["薄弱点1"],"actionItems":["行动1","行动2"]}}'

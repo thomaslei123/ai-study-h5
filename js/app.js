@@ -141,6 +141,7 @@
     // 上传区（科目由 AI 自动识别，无需手选；可拍照判题，也可只输入文字分析）
     html += '<div class="card upload">';
     html += '<p class="hint" style="margin:0 0 8px">拍作业 → 自动判题；或直接输入问题/题目 → AI 分析解答（拍照可选）</p>';
+    html += '<p class="hint" style="margin:-2px 0 8px;color:#c0392b">⚠️ 一次只判「同一份/同科目」试卷（多页可多拍）；不同科目请分开判，否则会判错。</p>';
     html += renderModelPicker();
     html += '<div class="thumbs">' + state.images.map(function (im, i) {
       return '<div class="thumb"><img src="' + im.dataURL + '"/><span class="del" data-del="' + i + '">×</span></div>';
@@ -178,6 +179,7 @@
     var s = a.summary;
     var h = '<div class="card result">';
     h += '<div class="sumbar"><b>' + esc(a.subjectName) + '</b> · 共' + s.total + '题 · <span class="bad">错' + s.wrong + '</span> · <span class="warn">存疑' + s.warning + '</span> · 得分率' + s.scoreRate + '%</div>';
+    if (a.question) h += '<div class="askrec">📝 你的补充：' + esc(a.question) + '</div>';
     if (s.suggestion) h += '<div class="suggest">💡 ' + esc(s.suggestion) + '</div>';
     // 题号 tab
     h += '<div class="qnums">' + a.questions.map(function (q, i) {
@@ -186,7 +188,11 @@
     var q = a.questions[state.activeQ] || a.questions[0];
     if (q) {
       h += '<div class="qdetail">';
-      if (a.images && a.images.length) h += '<img class="paper" src="' + a.images[0].dataURL + '" data-zoom/>';
+      if (a.images && a.images.length) {
+        h += '<div class="papers">' + a.images.map(function (im) {
+          return '<img class="paper" src="' + im.dataURL + '" data-zoom/>';
+        }).join('') + '</div>';
+      }
       h += '<div class="qbody">';
       h += '<div class="qline"><span class="badge ' + q.status + '">' + statusMark(q.status) + '</span> ' + esc(q.number) + '　' + esc(q.title) + '</div>';
       if (q.studentAnswer) h += '<p><b>作答：</b>' + esc(q.studentAnswer) + '</p>';
