@@ -30,7 +30,8 @@
       body: JSON.stringify({
         grade: payload.grade,
         images: payload.images || [],
-        question: payload.question || ''
+        question: payload.question || '',
+        model: Store.getSettings().model || 'claude'
       })
     }).then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -123,7 +124,7 @@
       return fetch(base + '/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ grade: grade, subjectName: subjectName || '', messages: messages })
+        body: JSON.stringify({ grade: grade, subjectName: subjectName || '', messages: messages, model: Store.getSettings().model || 'claude' })
       }).then(function (r) {
         if (!r.ok) throw new Error('HTTP ' + r.status);
         return r.json();

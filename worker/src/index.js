@@ -33,8 +33,12 @@ function json(obj, status) {
 }
 
 /* ---------- 配置（CF 环境变量 / secrets，缺省给默认） ---------- */
+/* 判题/答疑优先用 Claude(ANTHROPIC_API_KEY)，失败或缺 key 回退智谱 GLM / DeepSeek。 */
 function conf(env) {
   return {
+    claudeBase: (env.CLAUDE_BASE_URL || 'https://api.anthropic.com').replace(/\/$/, ''),
+    claudeKey: env.ANTHROPIC_API_KEY || '',
+    claudeModel: env.CLAUDE_MODEL || 'claude-opus-4-8',
     glmBase: (env.GLM_BASE_URL || 'https://open.bigmodel.cn/api/paas/v4').replace(/\/$/, ''),
     glmKey: env.GLM_API_KEY || '',
     glmModel: env.GLM_MODEL || 'glm-4.6v',
@@ -53,31 +57,75 @@ function toBase64List(images) {
   }).filter(Boolean).slice(0, 6);
 }
 
+/* 解析图片为 {b64, media}（Claude 需要 media_type，智谱只要纯 base64）。 */
+function parseImages(images) {
+  return (images || []).map(function (im) {
+    var s = typeof im === 'string' ? im : (im && im.dataURL) || '';
+    var media = 'image/jpeg';
+    var m = s.match(/^data:([^;]+);base64,/);
+    if (m) media = m[1];
+    var i = s.indexOf('base64,');
+    var b64 = i >= 0 ? s.slice(i + 7) : s;
+    return b64 ? { b64: b64, media: media } : null;
+  }).filter(Boolean).slice(0, 6);
+}
+
 /* ---------- /analyze 判题 ---------- */
 async function analyze(request, env) {
   const c = conf(env);
-  if (!c.glmKey) return json({ error: '后端未配置 GLM_API_KEY' }, 500);
+  if (!c.claudeKey && !c.glmKey) return json({ error: '后端未配置 ANTHROPIC_API_KEY 或 GLM_API_KEY' }, 500);
   const body = await request.json();
   const grade = gradeName(body.grade);
-  const images = toBase64List(body.images);
-  if (!images.length) return json({ error: '未收到图片' }, 400);
+  const imgs = parseImages(body.images);
+  if (!imgs.length) return json({ error: '未收到图片' }, 400);
 
   const sys = analyzeSystemPrompt(grade);
   const userText = analyzeUserText(body.question || '');
-  const content = [{ type: 'text', text: userText }];
-  images.forEach(function (b64) { content.push({ type: 'image_url', image_url: { url: b64 } }); });
 
-  const data = await callGLM(c, [
-    { role: 'system', content: sys },
-    { role: 'user', content: content }
-  ], 0.2);
-  const text = pick(data);
+  const text = await analyzeCall(c, sys, userText, imgs, body.model);
   const parsed = parseJSON(text);
   if (!parsed.questions || !parsed.questions.length) {
     return json({ error: '模型未返回有效题目', raw: String(text).slice(0, 500) }, 502);
   }
   reconcile(parsed.questions); // 兜底：纯数字答案对不上却标对的，强制判错
   return json(parsed);
+}
+
+/* 按能力 + 用户首选生成尝试顺序：判题/带图只能 claude/glm；纯文字才能 deepseek。
+   把前端选的 model 排第一，其余按 claude→glm→deepseek 补到后面做回退，且只保留有 key 的。 */
+function pickOrder(model, needImage, c) {
+  var cap = needImage ? ['claude', 'glm'] : ['claude', 'glm', 'deepseek'];
+  var pref = (model && cap.indexOf(model) >= 0)
+    ? [model].concat(cap.filter(function (p) { return p !== model; }))
+    : cap;
+  return pref.filter(function (p) {
+    return (p === 'claude' && c.claudeKey) || (p === 'glm' && c.glmKey) || (p === 'deepseek' && c.dsKey);
+  });
+}
+
+/* 判题调用：按 model 首选(claude/glm)，失败自动回退另一个。 */
+async function analyzeCall(c, sys, userText, imgs, model) {
+  var order = pickOrder(model, true, c);
+  if (!order.length) throw new Error('未配置可用的判题模型（需 Claude 或 GLM 的 key）');
+  var lastErr;
+  for (var i = 0; i < order.length; i++) {
+    try { return await analyzeVia(order[i], c, sys, userText, imgs); }
+    catch (e) { lastErr = e; console.log('[analyze] ' + order[i] + ' 失败，回退：' + (e && e.message || e)); }
+  }
+  throw lastErr || new Error('判题失败');
+}
+
+async function analyzeVia(provider, c, sys, userText, imgs) {
+  if (provider === 'claude') {
+    const content = [{ type: 'text', text: userText }];
+    imgs.forEach(function (im) {
+      content.push({ type: 'image', source: { type: 'base64', media_type: im.media, data: im.b64 } });
+    });
+    return await callClaude(c, sys, [{ role: 'user', content: content }], 8192);
+  }
+  const content = [{ type: 'text', text: userText }];
+  imgs.forEach(function (im) { content.push({ type: 'image_url', image_url: { url: im.b64 } }); });
+  return pick(await callGLM(c, [{ role: 'system', content: sys }, { role: 'user', content: content }], 0.2));
 }
 
 /* 数字类答案的确定性校正：correct 但学生答案≠正确答案（都为纯数值）时，纠正为 wrong。
@@ -141,32 +189,60 @@ async function chat(request, env) {
     .slice(-16);
   if (!history.length) return json({ error: '没有提问内容' }, 400);
 
-  // 历史里是否带图（只有最后一条带图时走视觉）
-  const last = history[history.length - 1];
-  const lastImages = toBase64List(last && last.images);
+  const sys = tutorSystem(grade, subjectName);
+  const reply = await chatCall(c, sys, history, body.model);
+  if (!reply) return json({ error: '模型未返回内容' }, 502);
+  return json({ reply: reply });
+}
 
-  let reply;
-  if (lastImages.length) {
-    if (!c.glmKey) return json({ error: '后端未配置 GLM_API_KEY' }, 500);
-    const messages = [{ role: 'system', content: tutorSystem(grade, subjectName) }];
-    history.forEach(function (m, i) {
-      if (i === history.length - 1) {
+/* 答疑调用：按 model 首选，失败自动回退。带图时只在 claude/glm 间选；纯文字可用 deepseek。 */
+async function chatCall(c, sys, history, model) {
+  const last = history[history.length - 1];
+  const hasImg = !!(last && last.images && last.images.length);
+  var order = pickOrder(model, hasImg, c);
+  if (!order.length) throw new Error(hasImg ? '看图答疑需 Claude 或 GLM 的 key' : '未配置可用的答疑模型');
+  var lastErr;
+  for (var i = 0; i < order.length; i++) {
+    try { return await chatVia(order[i], c, sys, history); }
+    catch (e) { lastErr = e; console.log('[chat] ' + order[i] + ' 失败，回退：' + (e && e.message || e)); }
+  }
+  throw lastErr || new Error('答疑失败');
+}
+
+async function chatVia(provider, c, sys, history) {
+  if (provider === 'claude') {
+    const messages = history.map(function (m) {
+      const role = m.role === 'assistant' ? 'assistant' : 'user';
+      const imgs = parseImages(m.images);
+      if (imgs.length) {
         const content = [{ type: 'text', text: m.content || '请看图，帮我讲讲这道题。' }];
-        lastImages.forEach(function (b64) { content.push({ type: 'image_url', image_url: { url: b64 } }); });
+        imgs.forEach(function (im) {
+          content.push({ type: 'image', source: { type: 'base64', media_type: im.media, data: im.b64 } });
+        });
+        return { role: role, content: content };
+      }
+      return { role: role, content: String(m.content || '') };
+    });
+    return await callClaude(c, sys, messages, 4096);
+  }
+  if (provider === 'glm') {
+    const messages = [{ role: 'system', content: sys }];
+    history.forEach(function (m, i) {
+      const imgs = toBase64List(m.images);
+      if (i === history.length - 1 && imgs.length) {
+        const content = [{ type: 'text', text: m.content || '请看图，帮我讲讲这道题。' }];
+        imgs.forEach(function (b64) { content.push({ type: 'image_url', image_url: { url: b64 } }); });
         messages.push({ role: 'user', content: content });
       } else {
         messages.push({ role: m.role, content: String(m.content || '') });
       }
     });
-    reply = pick(await callGLM(c, messages, 0.4));
-  } else {
-    if (!c.dsKey) return json({ error: '后端未配置 DEEPSEEK_API_KEY' }, 500);
-    const messages = [{ role: 'system', content: tutorSystem(grade, subjectName) }]
-      .concat(history.map(function (m) { return { role: m.role, content: String(m.content || '') }; }));
-    reply = pick(await callDeepSeek(c, messages));
+    return pick(await callGLM(c, messages, 0.4));
   }
-  if (!reply) return json({ error: '模型未返回内容' }, 502);
-  return json({ reply: reply });
+  // deepseek 纯文字
+  const messages = [{ role: 'system', content: sys }]
+    .concat(history.map(function (m) { return { role: m.role, content: String(m.content || '') }; }));
+  return pick(await callDeepSeek(c, messages));
 }
 
 function tutorSystem(grade, subjectName) {
@@ -181,6 +257,30 @@ function tutorSystem(grade, subjectName) {
 }
 
 /* ---------- 模型调用 ---------- */
+/* Claude Messages API（raw HTTP）：system 顶层、图片用 image/base64 块、回复在 content[].text。
+   thinking 省略=关闭(Opus 4.8 默认)，判题/答疑要 JSON/纯文本，省思考更快更省。 */
+async function callClaude(c, system, messages, maxTokens) {
+  const payload = { model: c.claudeModel, max_tokens: maxTokens || 4096, system: system, messages: messages };
+  const resp = await fetch(c.claudeBase + '/v1/messages', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-api-key': c.claudeKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify(payload)
+  });
+  const raw = await resp.text();
+  if (!resp.ok) throw new Error('Claude 接口 ' + resp.status + '：' + raw.slice(0, 300));
+  let data;
+  try { data = JSON.parse(raw); } catch (e) { throw new Error('Claude 返回非 JSON：' + raw.slice(0, 300)); }
+  if (data.stop_reason === 'refusal') throw new Error('Claude 拒答(refusal)');
+  const text = (data.content || []).filter(function (b) { return b.type === 'text'; })
+    .map(function (b) { return b.text; }).join('');
+  if (!text) throw new Error('Claude 空回复');
+  return text;
+}
+
 async function callGLM(c, messages, temperature) {
   const payload = { model: c.glmModel, temperature: temperature, max_tokens: 8192, messages: messages };
   if (/bigmodel\.cn/i.test(c.glmBase)) payload.thinking = { type: 'disabled' }; // 关思考：34s→10s 且吐干净 JSON

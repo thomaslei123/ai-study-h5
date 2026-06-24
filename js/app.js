@@ -111,34 +111,57 @@
     });
   }
 
+  /* 可选 AI 模型（判题/答疑共用此选择） */
+  var MODELS = [
+    { id: 'claude', name: 'Claude', tip: '最强' },
+    { id: 'glm', name: '智谱', tip: '视觉' },
+    { id: 'deepseek', name: 'DeepSeek', tip: '仅答疑' }
+  ];
+  function renderModelPicker() {
+    var cur = Store.getSettings().model || 'claude';
+    var h = '<div class="modelrow"><span class="mlbl">模型</span><div class="chips sm">';
+    h += MODELS.map(function (m) {
+      return '<button class="chip' + (cur === m.id ? ' on' : '') + '" data-model="' + m.id + '">' + m.name +
+        '<i>' + m.tip + '</i></button>';
+    }).join('');
+    h += '</div></div>';
+    return h;
+  }
+  function bindModelPicker() {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-model]'), function (b) {
+      b.onclick = function () { Store.saveSettings({ model: b.getAttribute('data-model') }); render(); };
+    });
+  }
+
   /* ============ 问答（拍照判题 + 追问） ============ */
   function viewHome() {
-    var html = '<header class="hd"><h1>📷 拍照判题</h1><span class="grade-pill" id="gradePill">' + Data.getGradeName(state.grade) + ' ▾</span></header>';
+    var html = '<header class="hd"><h1>📷 作业分析</h1><span class="grade-pill" id="gradePill">' + Data.getGradeName(state.grade) + ' ▾</span></header>';
     html += '<div class="page">';
 
-    // 上传区（科目由 AI 自动识别，无需手选）
+    // 上传区（科目由 AI 自动识别，无需手选；可拍照判题，也可只输入文字分析）
     html += '<div class="card upload">';
-    html += '<p class="hint" style="margin:0 0 8px">拍作业 → AI 自动识别科目并判题</p>';
+    html += '<p class="hint" style="margin:0 0 8px">拍作业 → 自动判题；或直接输入问题/题目 → AI 分析解答（拍照可选）</p>';
+    html += renderModelPicker();
     html += '<div class="thumbs">' + state.images.map(function (im, i) {
       return '<div class="thumb"><img src="' + im.dataURL + '"/><span class="del" data-del="' + i + '">×</span></div>';
-    }).join('') + '<label class="addimg"><input type="file" accept="image/*" capture="environment" id="fileIn" multiple hidden/>＋拍/选</label></div>';
-    html += '<textarea id="qText" class="qtext" rows="1" placeholder="可补充：问哪道题、哪里不懂（选填）"></textarea>';
-    html += '<button class="btn primary block" id="analyzeBtn"' + (state.busy ? ' disabled' : '') + '>' + (state.busy ? '判题中…' : '开始判题') + '</button>';
-    if (Api.mode() === 'mock') html += '<p class="hint">当前为本地示例模式。接入 AI 后端后即真实判题（我的 → 后端地址）。</p>';
+    }).join('') + '<label class="addimg"><input type="file" accept="image/*" capture="environment" id="fileIn" multiple hidden/>＋拍/选（选填）</label></div>';
+    html += '<textarea id="qText" class="qtext" rows="1" placeholder="输入要分析的问题或题目；拍了照可补充说明"></textarea>';
+    html += '<button class="btn primary block" id="analyzeBtn"' + (state.busy ? ' disabled' : '') + '>' + (state.busy ? '分析中…' : '开始分析') + '</button>';
+    if (Api.mode() === 'mock') html += '<p class="hint">当前为本地示例模式。接入 AI 后端后即真实分析（我的 → 后端地址）。</p>';
     html += '</div>';
 
-    // 判题结果（作业帮式）
-    if (state.analysis) {
-      html += renderResult(state.analysis);
-      html += renderChat();
-    }
+    // 判题结果（作业帮式，仅拍照判题时有）
+    if (state.analysis) html += renderResult(state.analysis);
+    // 对话/解答区（拍照后可追问；纯文字分析时即问答）
+    if (state.analysis || state.chat.length) html += renderChat();
 
     html += '</div>';
     return html;
   }
 
   function renderChat() {
-    var h = '<div class="card chat"><h3>💬 问 AI 老师<span class="sub">（针对这张卷子追问）</span></h3>';
+    var title = state.analysis ? '💬 问 AI 老师<span class="sub">（针对这张卷子追问）</span>' : '💬 AI 解答<span class="sub">（可继续追问）</span>';
+    var h = '<div class="card chat"><h3>' + title + '</h3>';
     h += '<div class="msgs">';
     if (!state.chat.length) h += '<p class="hint">例如：第2题为什么错？这个知识点还能怎么考？</p>';
     state.chat.forEach(function (m) {
@@ -183,6 +206,7 @@
       Store.saveSettings({ grade: state.grade });
       render();
     };
+    bindModelPicker();
     var fileIn = document.getElementById('fileIn');
     if (fileIn) fileIn.onchange = function () { readFiles(fileIn.files); };
     Array.prototype.forEach.call(document.querySelectorAll('[data-del]'), function (x) {
@@ -238,19 +262,32 @@
   }
 
   function doAnalyze() {
-    if (!state.images.length) {
-      alert('先拍一张作业照片'); return;
+    var text = (((document.getElementById('qText') || {}).value) || '').trim();
+    if (!state.images.length && !text) {
+      alert('拍一张作业照片，或输入要分析的问题'); return;
     }
-    state.busy = true; render();
-    Api.analyzeHomework({
-      grade: state.grade,
-      images: state.images,
-      question: (document.getElementById('qText') || {}).value || ''
-    }).then(function (a) {
-      Store.saveAnalysis(a);
-      state.analysis = a; state.activeQ = 0; state.busy = false; state.chat = []; render();
+    if (state.images.length) {
+      // 有图：作业帮式结构化判题
+      state.busy = true; render();
+      Api.analyzeHomework({
+        grade: state.grade, images: state.images, question: text
+      }).then(function (a) {
+        Store.saveAnalysis(a);
+        state.analysis = a; state.activeQ = 0; state.busy = false; state.chat = []; render();
+      }).catch(function (e) {
+        state.busy = false; render(); alert('分析失败：' + e.message);
+      });
+      return;
+    }
+    // 纯文字：直接让 AI 分析解答（走问答，无需拍照）
+    state.analysis = null;
+    state.chat = [{ role: 'user', content: text }];
+    state.chatBusy = true; state.busy = false; render();
+    Api.chat([{ role: 'user', content: text }], state.grade, '').then(function (reply) {
+      state.chat.push({ role: 'assistant', content: reply });
+      state.chatBusy = false; render();
     }).catch(function (e) {
-      state.busy = false; render(); alert('判题失败：' + e.message);
+      state.chatBusy = false; render(); alert('分析失败：' + e.message);
     });
   }
 

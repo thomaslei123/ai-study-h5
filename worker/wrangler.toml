@@ -11,3 +11,5 @@ GLM_BASE_URL = "https://open.bigmodel.cn/api/paas/v4"
 GLM_MODEL = "glm-4.6v"
 DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 DEEPSEEK_MODEL = "deepseek-chat"
+# Opentrons 公司 key 组织级只放开 Haiku（opus-4-8/sonnet-4-6 返回 rate_limit_error=额度0）。
+CLAUDE_MODEL = "claude-haiku-4-5"

@@ -27,8 +27,9 @@
   // 默认后端 = 已部署的 Cloudflare Worker（密钥在 CF，不在此）。任何设备打开即可真判题。
   var DEFAULT_BACKEND = 'https://ai-kefu-proxy.thomaslei123.workers.dev';
   function getSettings() {
-    var s = read(K.settings, { grade: 'g7', backendUrl: DEFAULT_BACKEND });
+    var s = read(K.settings, { grade: 'g7', backendUrl: DEFAULT_BACKEND, model: 'claude' });
     if (!s.backendUrl) s.backendUrl = DEFAULT_BACKEND;
+    if (!s.model) s.model = 'claude'; // 默认用 Claude（判题/答疑优先），可在问答页切换
     return s;
   }
   function saveSettings(patch) {
