@@ -141,7 +141,7 @@
     // 上传区（科目由 AI 自动识别，无需手选；可拍照判题，也可只输入文字分析）
     html += '<div class="card upload">';
     html += '<p class="hint" style="margin:0 0 8px">拍作业 → 自动判题；或直接输入问题/题目 → AI 分析解答（拍照可选）</p>';
-    html += '<p class="hint" style="margin:-2px 0 8px;color:#c0392b">⚠️ 一次只判「同一份/同科目」试卷（多页可多拍）；不同科目请分开判，否则会判错。</p>';
+    html += '<p class="hint" style="margin:-2px 0 8px;color:#c0392b">⚠️ 同一份卷子识别不全时：把它分上半/下半两张拍，一起上传，识别更全（题更大更清）。不同科目请分开判。</p>';
     html += renderModelPicker();
     html += '<div class="thumbs">' + state.images.map(function (im, i) {
       return '<div class="thumb"><img src="' + im.dataURL + '"/><span class="del" data-del="' + i + '">×</span></div>';
