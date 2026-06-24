@@ -166,6 +166,7 @@ function analyzeSystemPrompt(grade) {
     '5. 每道题的 knowledgePoint 填最贴近的该科知识点（如"有理数运算""古诗文默写""一般现在时"）。',
     '6. status 取值：correct(正确) / wrong(错误) / warning(疑似存疑)。【特别规定】studentAnswer 为"未作答"的题，status 必须填 warning（不是 wrong），表示待确认是否真没做。',
     '7. 【严禁臆造学生答案】不要替学生编造、猜测答案；字迹看不清就在 explanation 注明"字迹不清，请核对"，studentAnswer 填你能看清的部分或"字迹不清"。',
+    '7a.【绝不假设答对·最关键】这是最常见的严重错误：当你看不清学生到底写了什么、或题目旁边没有清晰的学生笔迹时，【绝对不要】假设他写了正确答案，更【绝对不要】把标准答案当成他的作答填进 studentAnswer。规则：看不清→studentAnswer="字迹不清"、status=warning；空白→studentAnswer="未作答"、status=warning。只有你【清楚看到】学生亲笔写的内容、且与正确答案一致，才能标 correct。【自检】若你判出来一整份卷子几乎全对（正确率>90%）或得分率很高，极可能是你在"假设答对"而非真读——请重新逐题确认每个 studentAnswer 都是你真看到的笔迹，否则改成 warning。',
     '8. 【输出前自检·必须执行】逐题检查：studentAnswer 已作答且与 correctAnswer 不相等 → status 必须是 wrong；studentAnswer="未作答" → status 必须是 warning；不允许"答案不同却标 correct"的矛盾。',
     '8a.【多张图/多份试卷·重要】若上传的图片包含不同科目或不同试卷，只批改其中题目最多、作答最完整的【同一份】试卷，subject 填这一份的科目；绝不要把不同试卷的题目混在一起，更不要拿甲卷（如语文）的作答去套到乙卷（如英语）。判完在 summary.suggestion 里注明"检测到多份试卷，只批改了其中X科"。',
     '8b.【整卷空白·重要】若某份试卷几乎没有任何作答痕迹（全空），它的每道题 studentAnswer 一律填"未作答"、status 一律 warning，summary 得分不要给高分；严禁因为题目本身有标准答案就标 correct 或臆造学生得分。',
