@@ -86,7 +86,9 @@
         knowledgePoint: q.knowledgePoint || '',
         errorType: q.errorType || '',
         explanation: q.explanation || '',
-        similarQuestions: q.similarQuestions || []
+        similarQuestions: q.similarQuestions || [],
+        imageIndex: (typeof q.imageIndex === 'number' && q.imageIndex >= 0) ? q.imageIndex : 0,
+        bbox: (Array.isArray(q.bbox) && q.bbox.length === 4) ? q.bbox : null
       };
     });
     var wrong = questions.filter(function (q) { return q.status === 'wrong'; }).length;

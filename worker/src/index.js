@@ -170,9 +170,10 @@ function analyzeSystemPrompt(grade) {
     '8. 【输出前自检·必须执行】逐题检查：studentAnswer 已作答且与 correctAnswer 不相等 → status 必须是 wrong；studentAnswer="未作答" → status 必须是 warning；不允许"答案不同却标 correct"的矛盾。',
     '8a.【多张图/多份试卷·重要】若上传的图片包含不同科目或不同试卷，只批改其中题目最多、作答最完整的【同一份】试卷，subject 填这一份的科目；绝不要把不同试卷的题目混在一起，更不要拿甲卷（如语文）的作答去套到乙卷（如英语）。判完在 summary.suggestion 里注明"检测到多份试卷，只批改了其中X科"。',
     '8b.【整卷空白·重要】若某份试卷几乎没有任何作答痕迹（全空），它的每道题 studentAnswer 一律填"未作答"、status 一律 warning，summary 得分不要给高分；严禁因为题目本身有标准答案就标 correct 或臆造学生得分。',
-    '9. 只输出一个 JSON 对象，不要任何额外文字或 Markdown 代码块。',
+    '9. 【每题定位·查看原题】为每道题加两个字段：imageIndex（该题在第几张图，从 0 开始的整数；只有一张图就填 0）、bbox（该题在那张图中的大致位置矩形，用相对比例 [左,上,右,下]，取值 0~1，原点在图片左上角；例如 [0.05,0.30,0.95,0.46] 表示横跨左右、位于上中部）。尽量把该题的题干+作答区一起框进去，宁可框大一点也别框错位置。',
+    '10. 只输出一个 JSON 对象，不要任何额外文字或 Markdown 代码块。',
     'JSON 结构：',
-    '{"subject":"语文","questions":[{"number":"第1题","status":"wrong","title":"题干","studentAnswer":"学生答案","correctAnswer":"参考答案","knowledgePoint":"知识点","errorType":"错因","explanation":"解析","similarQuestions":["同类题1","同类题2"]}],"summary":{"suggestion":"一句话总结建议","mainWeakPoints":["薄弱点1"],"actionItems":["行动1","行动2"]}}'
+    '{"subject":"语文","questions":[{"number":"第1题","status":"wrong","title":"题干","studentAnswer":"学生答案","correctAnswer":"参考答案","knowledgePoint":"知识点","errorType":"错因","explanation":"解析","similarQuestions":["同类题1","同类题2"],"imageIndex":0,"bbox":[0.05,0.30,0.95,0.46]}],"summary":{"suggestion":"一句话总结建议","mainWeakPoints":["薄弱点1"],"actionItems":["行动1","行动2"]}}'
   ].join('\n');
 }
 

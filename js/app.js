@@ -189,9 +189,17 @@
     if (q) {
       h += '<div class="qdetail">';
       if (a.images && a.images.length) {
-        h += '<div class="papers">' + a.images.map(function (im) {
-          return '<img class="paper" src="' + im.dataURL + '" data-zoom/>';
-        }).join('') + '</div>';
+        var qi = (q.imageIndex != null && a.images[q.imageIndex]) ? q.imageIndex : 0;
+        var im = a.images[qi];
+        var box = '';
+        if (q.bbox) {
+          var cl = function (v) { return Math.max(0, Math.min(1, v)); };
+          var L = cl(q.bbox[0]) * 100, T = cl(q.bbox[1]) * 100;
+          var W = (cl(q.bbox[2]) - cl(q.bbox[0])) * 100, H = (cl(q.bbox[3]) - cl(q.bbox[1])) * 100;
+          if (W > 0 && H > 0) box = '<span class="qbox" style="left:' + L + '%;top:' + T + '%;width:' + W + '%;height:' + H + '%"></span>';
+        }
+        h += '<div class="paperwrap" data-zoomi="' + qi + '"><img class="paper" src="' + im.dataURL + '"/>' + box +
+          '<span class="zoomhint">🔍 查看原题' + (a.images.length > 1 ? '（第' + (qi + 1) + '张）' : '') + '</span></div>';
       }
       h += '<div class="qbody">';
       h += '<div class="qline"><span class="badge ' + q.status + '">' + statusMark(q.status) + '</span> ' + esc(q.number) + '　' + esc(q.title) + '</div>';
@@ -229,6 +237,12 @@
     });
     Array.prototype.forEach.call(document.querySelectorAll('[data-zoom]'), function (img) {
       img.onclick = function () { zoom(img.src); };
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-zoomi]'), function (el) {
+      el.onclick = function () {
+        var idx = +el.getAttribute('data-zoomi'), a = state.analysis;
+        if (a && a.images[idx]) zoom(a.images[idx].dataURL);
+      };
     });
     var ask = document.getElementById('askText');
     if (ask) {

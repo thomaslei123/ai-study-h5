@@ -43,6 +43,10 @@ body{
 .askrec{background:#eef3ff;border-left:3px solid var(--blue);border-radius:6px;padding:6px 10px;margin:8px 0;font-size:13px;color:#334}
 .papers{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
 .papers .paper{flex:0 0 auto;max-height:240px;border-radius:6px}
+.paperwrap{position:relative;display:inline-block;max-width:100%;cursor:zoom-in}
+.paperwrap .paper{display:block;max-width:100%;max-height:300px;border-radius:6px}
+.paperwrap .qbox{position:absolute;border:2.5px solid #e74c3c;background:rgba(231,76,60,.12);border-radius:3px;pointer-events:none;box-shadow:0 0 0 9999px rgba(0,0,0,.04)}
+.paperwrap .zoomhint{position:absolute;right:6px;bottom:6px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;padding:2px 7px;border-radius:10px}
 
 /* 上传区 */
 .thumbs{display:flex;flex-wrap:wrap;gap:8px}
